@@ -349,6 +349,8 @@
                 
                 setLoading(true);
                 setError(null);
+                setShowShoppingList(false);
+                setShoppingList(null);
                 
                 try {
                     const res = await fetch(`${API_URL}/scrape`, {
@@ -382,6 +384,8 @@
                 setLoading(true);
                 setError(null);
                 setUrl('');
+                setShowShoppingList(false);
+                setShoppingList(null);
                 
                 try {
                     const formData = new FormData();
@@ -410,6 +414,45 @@
                     // Reset file input
                     if (fileInputRef.current) {
                         fileInputRef.current.value = '';
+                    }
+                }
+            };
+            
+            const handleShoppingListUpload = async (e) => {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+                
+                setLoading(true);
+                setError(null);
+                setRecipe(null);
+                setOriginalRecipe(null);
+                setShowShoppingList(true);
+                
+                try {
+                    const formData = new FormData();
+                    for (let i = 0; i < files.length; i++) {
+                        formData.append('images', files[i]);
+                    }
+                    
+                    const res = await fetch(`${API_URL}/shopping-list`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Failed to create shopping list');
+                    }
+                    
+                    setShoppingList(data.ingredients);
+                } catch (err) {
+                    setError(err.message);
+                    setShowShoppingList(false);
+                } finally {
+                    setLoading(false);
+                    if (shoppingInputRef.current) {
+                        shoppingInputRef.current.value = '';
                     }
                 }
             };
@@ -520,6 +563,11 @@
             };
             
             const [currentUnit, setCurrentUnit] = React.useState('original');
+            const [copied, setCopied] = React.useState(false);
+            const [shoppingList, setShoppingList] = React.useState(null);
+            const [showShoppingList, setShowShoppingList] = React.useState(false);
+            
+            const shoppingInputRef = React.useRef(null);
             
             const handleKeyDown = (e) => {
                 if (e.key === 'Enter') scrapeRecipe();
@@ -544,7 +592,7 @@
             return (
                 <div className="container">
                     <h1>what are you cooking up?</h1>
-                    <p className="subtitle">paste a URL or upload a photo to extract, scale, and convert</p>
+                    <p className="subtitle">paste a URL, upload a photo, or combine multiple recipes into a shopping list</p>
                     
                     <div className="input-section">
                         <input
@@ -576,6 +624,22 @@
                         >
                             📷 Upload
                         </button>
+                        <input
+                            type="file"
+                            ref={shoppingInputRef}
+                            onChange={handleShoppingListUpload}
+                            accept="image/*"
+                            multiple
+                            style={{display: 'none'}}
+                        />
+                        <button 
+                            className="btn-secondary"
+                            onClick={() => shoppingInputRef.current?.click()}
+                            disabled={loading}
+                            style={{whiteSpace: 'nowrap'}}
+                        >
+                            🛒 Shopping List
+                        </button>
                     </div>
                     
                     {error && <div className="error">{error}</div>}
@@ -583,11 +647,48 @@
                     {loading && (
                         <div className="loading">
                             <div className="loading-spinner"></div>
-                            <p style={{marginTop: '1rem'}}>Extracting recipe...</p>
+                            <p style={{marginTop: '1rem'}}>{showShoppingList ? 'Creating shopping list...' : 'Extracting recipe...'}</p>
                         </div>
                     )}
                     
-                    {recipe && !loading && (
+                    {showShoppingList && shoppingList && !loading && (
+                        <div className="recipe-card">
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
+                                <h2 className="recipe-title">🛒 Shopping List</h2>
+                                <button 
+                                    className="btn-secondary" 
+                                    onClick={() => {
+                                        const text = shoppingList
+                                            .map(ing => {
+                                                const qty = ing.quantity ? formatQuantity(ing.quantity) : '';
+                                                const unit = ing.unit || '';
+                                                return `${qty} ${unit} ${ing.item}`.trim();
+                                            })
+                                            .join('\n');
+                                        navigator.clipboard.writeText(text);
+                                        setCopied(true);
+                                        setTimeout(() => setCopied(false), 2000);
+                                    }}
+                                    style={{padding: '6px 12px', fontSize: '14px'}}
+                                >
+                                    {copied ? '✓ Copied!' : '📋 Copy'}
+                                </button>
+                            </div>
+                            <p style={{color: '#666', marginBottom: '20px', fontSize: '15px'}}>
+                                {shoppingList.length} ingredients from your recipes, combined and sorted
+                            </p>
+                            {shoppingList.map((ing, i) => (
+                                <div key={i} className="ingredient">
+                                    <span className="ingredient-qty">
+                                        {formatQuantity(ing.quantity)} {ing.unit || ''}
+                                    </span>
+                                    <span className="ingredient-item">{ing.item}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    
+                    {recipe && !loading && !showShoppingList && (
                         <>
                             <div className="controls">
                                 <button className={`btn-secondary ${currentScale === 0.5 ? 'active' : ''}`} onClick={() => scaleFromOriginal(0.5)}>½×</button>
@@ -622,7 +723,27 @@
                                 </div>
                                 
                                 <div className="ingredients">
-                                    <h3 className="section-title">Ingredients</h3>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+                                        <h3 className="section-title" style={{margin: 0}}>Ingredients</h3>
+                                        <button 
+                                            className="btn-secondary" 
+                                            onClick={() => {
+                                                const text = recipe.ingredients
+                                                    .map(ing => {
+                                                        const qty = ing.quantity ? formatQuantity(ing.quantity) : '';
+                                                        const unit = ing.unit || '';
+                                                        return `${qty} ${unit} ${ing.item}`.trim();
+                                                    })
+                                                    .join('\n');
+                                                navigator.clipboard.writeText(text);
+                                                setCopied(true);
+                                                setTimeout(() => setCopied(false), 2000);
+                                            }}
+                                            style={{padding: '6px 12px', fontSize: '14px'}}
+                                        >
+                                            {copied ? '✓ Copied!' : '📋 Copy'}
+                                        </button>
+                                    </div>
                                     {recipe.ingredients.map((ing, i) => (
                                         <div key={i} className="ingredient">
                                             <span className="ingredient-qty">

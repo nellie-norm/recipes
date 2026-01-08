@@ -4,6 +4,8 @@ Recipe API - Flask backend for the recipe tool
 """
 
 import os
+import re
+import json
 import base64
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -112,12 +114,10 @@ Rules:
         
         # Try to extract JSON if wrapped in code blocks
         if '```' in response_text:
-            import re
             json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
             if json_match:
                 response_text = json_match.group(1)
         
-        import json
         recipe_data = json.loads(response_text)
         
         # Convert to Recipe object
@@ -146,6 +146,134 @@ Rules:
         return jsonify({'error': f'Failed to parse recipe from image: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/shopping-list', methods=['POST'])
+def create_shopping_list():
+    """Extract ingredients from multiple images and consolidate into a shopping list."""
+    
+    if not ANTHROPIC_API_KEY:
+        return jsonify({'error': 'ANTHROPIC_API_KEY not set. Run: export ANTHROPIC_API_KEY=your-key'}), 500
+    
+    images = request.files.getlist('images')
+    
+    if len(images) < 1:
+        return jsonify({'error': 'Please upload at least one image'}), 400
+    
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        
+        all_ingredients = []
+        
+        # Extract ingredients from each image
+        for image_file in images:
+            image_data = base64.standard_b64encode(image_file.read()).decode('utf-8')
+            content_type = image_file.content_type or 'image/jpeg'
+            
+            message = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2048,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": content_type,
+                                    "data": image_data,
+                                },
+                            },
+                            {
+                                "type": "text",
+                                "text": """Extract ONLY the ingredients from this recipe image. Return ONLY valid JSON array, no other text:
+
+[
+  {"quantity": 2, "unit": "cups", "item": "flour"},
+  {"quantity": 1, "unit": "tsp", "item": "salt"},
+  {"quantity": null, "unit": null, "item": "fresh herbs"}
+]
+
+Rules:
+- quantity should be a number or null if not specified
+- unit should be a lowercase string or null (cups, tbsp, tsp, oz, g, ml, etc.)
+- item should be the ingredient name, normalized (e.g., "onion" not "onions, diced")
+- Return ONLY the JSON array, no markdown, no explanation"""
+                            }
+                        ],
+                    }
+                ],
+            )
+            
+            response_text = message.content[0].text.strip()
+            
+            # Try to extract JSON if wrapped in code blocks
+            if '```' in response_text:
+                json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
+                if json_match:
+                    response_text = json_match.group(1)
+            
+            ingredients = json.loads(response_text)
+            all_ingredients.extend(ingredients)
+        
+        # Consolidate ingredients
+        consolidated = consolidate_ingredients(all_ingredients)
+        
+        return jsonify({'ingredients': consolidated})
+        
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'Failed to parse ingredients: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def consolidate_ingredients(ingredients):
+    """Combine duplicate ingredients, adding quantities where possible."""
+    from collections import defaultdict
+    
+    # Group by normalized item name + unit
+    groups = defaultdict(list)
+    
+    for ing in ingredients:
+        item = ing.get('item', '').lower().strip()
+        unit = (ing.get('unit') or '').lower().strip()
+        
+        # Normalize common variations
+        item = item.rstrip('s') if item.endswith('s') and not item.endswith('ss') else item
+        
+        key = (item, unit)
+        groups[key].append(ing)
+    
+    # Combine quantities
+    result = []
+    for (item, unit), group in groups.items():
+        total_qty = None
+        has_qty = False
+        
+        for ing in group:
+            qty = ing.get('quantity')
+            if qty is not None:
+                has_qty = True
+                if total_qty is None:
+                    total_qty = 0
+                total_qty += qty
+        
+        # Use original case from first occurrence
+        original_item = group[0].get('item', item)
+        original_unit = group[0].get('unit', unit) if unit else None
+        
+        result.append({
+            'quantity': total_qty if has_qty else None,
+            'unit': original_unit,
+            'item': original_item
+        })
+    
+    # Sort by item name
+    result.sort(key=lambda x: x.get('item', '').lower())
+    
+    return result
 
 
 @app.route('/api/scale', methods=['POST'])
