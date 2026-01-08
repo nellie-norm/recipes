@@ -1,123 +1,93 @@
-# Recipe Tool 🍳
+# what are you cooking up? 🍳
 
-A Python tool to scrape recipes from URLs, extract the actual recipe (skipping the life story), and manipulate quantities.
+A recipe tool that extracts the actual recipe from URLs (skipping the life story), with scaling and unit conversion.
 
 ## Features
 
-- **URL Scraping** - Extracts recipes from Schema.org JSON-LD markup (works with most major recipe sites)
-- **Smart Parsing** - Handles fractions (½, ¾), mixed numbers (1 1/2), and various unit formats
-- **Scaling** - Halve, double, triple, or use any custom multiplier
-- **Unit Conversion** - Convert between metric and imperial units
-- **Clean Output** - Display as formatted text or export to JSON
+- **URL scraping** — extracts recipes from 400+ sites via JSON-LD schema and [recipe-scrapers](https://github.com/hhursev/recipe-scrapers)
+- **Smart parsing** — handles fractions (½, ¾), ranges (1-2 cups), and cleans up note cruft
+- **Scaling** — halve, double, triple, or use any multiplier (always from original, no compounding errors)
+- **Unit conversion** — switch between metric and imperial, with a reset to original
+- **Clean output** — filters out section headers and notes, keeps the useful stuff
 
-## Installation
+## Quick start
 
 ```bash
-pip install requests beautifulsoup4
+# Clone
+git clone https://github.com/nellie-norm/recipes.git
+cd recipes
+
+# Set up environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Run the API
+python app.py
+
+# In another terminal, serve the frontend
+python -m http.server 8080
 ```
 
-## Quick Start
+Open http://localhost:8080, paste a recipe URL, done.
 
-### As a Library
+## Usage
 
-```python
-from recipe_tool import RecipeScraper
+### Web UI
 
-# Scrape a recipe
-scraper = RecipeScraper()
-recipe = scraper.scrape("https://www.allrecipes.com/recipe/...")
+1. Paste a recipe URL
+2. Click **Extract**
+3. Use buttons to scale (½×, 2×, 3×) or convert units (Metric/Imperial)
+4. **1× (reset)** returns to original quantities
 
-# Display it
-print(recipe)
-
-# Scale it
-half = recipe.halve()
-doubled = recipe.double()
-custom = recipe.scale(1.5)  # 1.5x
-
-# Convert units
-metric = recipe.convert_to_metric()
-imperial = recipe.convert_to_imperial()
-
-# Export
-json_str = recipe.to_json()
-recipe_dict = recipe.to_dict()
-```
-
-### Interactive CLI
+### CLI
 
 ```bash
 python recipe_cli.py
 ```
 
-Then paste a recipe URL and use the menu to manipulate the recipe.
+### As a library
 
-## Supported Sites
+```python
+from recipe_tool import RecipeScraper
+
+scraper = RecipeScraper()
+recipe = scraper.scrape("https://www.recipetineats.com/pavlova-bombs/")
+
+print(recipe)
+print(recipe.halve())
+print(recipe.convert_to_metric())
+print(recipe.to_json())
+```
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `recipe_tool.py` | Core scraper, parser, and Recipe/Ingredient classes |
+| `app.py` | Flask API backend |
+| `index.html` | React frontend |
+| `recipe_cli.py` | Interactive command-line interface |
+| `requirements.txt` | Python dependencies |
+
+## Supported sites
 
 Works with any site using Schema.org Recipe markup, including:
+
 - AllRecipes
-- BBC Good Food
-- Food Network
+- BBC Good Food  
+- RecipeTin Eats
 - Serious Eats
 - Bon Appétit
+- Ottolenghi
 - NY Times Cooking
-- And many more...
+- And [many more](https://github.com/hhursev/recipe-scrapers#scrapers-available-for)...
 
-## Example Output
+## Known limitations
 
-```
-==================================================
-Classic Chocolate Chip Cookies
-==================================================
-Servings: 24
-Prep Time: 15m
-Cook Time: 10m
+- **Instructions aren't scaled** — quantities mentioned in instruction text (e.g., "makes 5 domes") stay as-is. A note appears when scaling.
+- **Some sites are weird** — if a site has non-standard markup, parsing may be incomplete
 
-──────────────────────────────
-INGREDIENTS
-──────────────────────────────
-  • 2 1/4 cups all-purpose flour
-  • 1 tsp baking soda
-  • 1 cup butter, softened
-  • 3/4 cup sugar
-  • 2 large eggs
-  • 2 cups chocolate chips
+## License
 
-──────────────────────────────
-INSTRUCTIONS
-──────────────────────────────
-  1. Preheat oven to 375°F.
-  2. Mix flour and baking soda.
-  ...
-```
-
-## API Reference
-
-### `Recipe` class
-
-| Method | Description |
-|--------|-------------|
-| `scale(factor)` | Scale by any multiplier |
-| `halve()` | Divide by 2 |
-| `double()` | Multiply by 2 |
-| `triple()` | Multiply by 3 |
-| `convert_to_metric()` | Convert to ml/g |
-| `convert_to_imperial()` | Convert to cups/oz |
-| `to_json()` | Export as JSON string |
-| `to_dict()` | Export as dictionary |
-
-### `Ingredient` class
-
-| Method | Description |
-|--------|-------------|
-| `scale(factor)` | Scale quantity |
-| `convert_unit(target)` | Convert to specific unit |
-
-## Next Steps
-
-Ideas for extending this tool:
-1. **Add photo support** - Use Claude's Vision API to extract recipes from images
-2. **Browser extension** - One-click extraction on any recipe page
-3. **Recipe database** - Save and organize scraped recipes
-4. **Shopping list** - Combine ingredients from multiple recipes
-5. **Nutrition info** - Calculate calories and macros
+MIT
