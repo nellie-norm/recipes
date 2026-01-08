@@ -342,6 +342,8 @@
             const [customScale, setCustomScale] = React.useState('1');
             const [currentScale, setCurrentScale] = React.useState(1);
             
+            const fileInputRef = React.useRef(null);
+            
             const scrapeRecipe = async () => {
                 if (!url.trim()) return;
                 
@@ -370,6 +372,45 @@
                     setError(err.message);
                 } finally {
                     setLoading(false);
+                }
+            };
+            
+            const handleImageUpload = async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                
+                setLoading(true);
+                setError(null);
+                setUrl('');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    
+                    const res = await fetch(`${API_URL}/extract-image`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Failed to extract recipe from image');
+                    }
+                    
+                    setOriginalRecipe(data);
+                    setRecipe(data);
+                    setCurrentScale(1);
+                    setCustomScale('1');
+                    setCurrentUnit('original');
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                    // Reset file input
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                    }
                 }
             };
             
@@ -503,7 +544,7 @@
             return (
                 <div className="container">
                     <h1>what are you cooking up?</h1>
-                    <p className="subtitle">paste a recipe URL to extract, scale, and convert</p>
+                    <p className="subtitle">paste a URL or upload a photo to extract, scale, and convert</p>
                     
                     <div className="input-section">
                         <input
@@ -511,7 +552,7 @@
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="https://www.allrecipes.com/recipe/..."
+                            placeholder="paste a recipe URL..."
                         />
                         <button 
                             className="btn-primary" 
@@ -519,6 +560,21 @@
                             disabled={loading || !url.trim()}
                         >
                             {loading ? 'Loading...' : 'Extract'}
+                        </button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleImageUpload}
+                            accept="image/*"
+                            style={{display: 'none'}}
+                        />
+                        <button 
+                            className="btn-secondary"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={loading}
+                            style={{whiteSpace: 'nowrap'}}
+                        >
+                            📷 Upload
                         </button>
                     </div>
                     

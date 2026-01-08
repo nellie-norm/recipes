@@ -675,6 +675,9 @@ class RecipeScraper:
         text = text.replace('\u2013', '-')  # En dash
         text = text.replace('\u2014', '-')  # Em dash
         text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        text = text.strip()
+        # Remove leading hyphens/dashes from instructions
+        text = re.sub(r'^[\-–—]\s*', '', text)
         return text.strip()
     
     def _parse_quantity(self, qty_str: str) -> Optional[float]:
