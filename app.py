@@ -11,8 +11,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from recipe_tool import RecipeScraper, Recipe, Ingredient
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Allow React frontend to call this
+
+
+@app.route('/')
+def serve_frontend():
+    return app.send_static_file('index.html')
 
 scraper = RecipeScraper()
 
@@ -326,5 +331,6 @@ if __name__ == '__main__':
     if not ANTHROPIC_API_KEY:
         print("⚠️  Warning: ANTHROPIC_API_KEY not set. Image extraction won't work.")
         print("   Run: export ANTHROPIC_API_KEY=your-key")
-    print("🍳 Recipe API running at http://localhost:5001")
-    app.run(debug=True, port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    print(f"🍳 Recipe API running at http://localhost:{port}")
+    app.run(debug=True, port=port, host='0.0.0.0')
