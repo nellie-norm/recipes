@@ -3,4 +3,4 @@ beautifulsoup4
 recipe-scrapers
 flask
 flask-cors
-anthropic
+anthropicgunicorn
