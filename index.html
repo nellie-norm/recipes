@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>what are you cooking up?</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        html {
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+        
+        body {
+            font-family: 'Cardo', Georgia, serif;
+            background: #F9F6EE;
+            color: #4B3621;
+            min-height: 100vh;
+            padding: 40px 20px;
+            font-kerning: normal;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 34px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.2px;
+            line-height: 1.2;
+            color: #4B3621;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 17px;
+        }
+        
+        .input-section {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1px solid #d4c9b8;
+            border-radius: 4px;
+            background: #fff;
+            color: #4B3621;
+            font-family: 'Cardo', Georgia, serif;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #CC5500;
+        }
+        
+        input[type="text"]::placeholder {
+            color: #999;
+        }
+        
+        button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 4px;
+            font-family: 'Cardo', Georgia, serif;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-primary {
+            background: #CC5500;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            opacity: 0.8;
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        
+        .btn-secondary {
+            background: #fff;
+            border: 1px solid #d4c9b8;
+            color: #4B3621;
+            padding: 10px 16px;
+            font-size: 15px;
+        }
+        
+        .btn-secondary:hover {
+            background: #f5f0e6;
+        }
+        
+        .btn-secondary.active {
+            background: #CC5500;
+            color: white;
+            border-color: #CC5500;
+        }
+        
+        .recipe-card {
+            background: #fff;
+            border-radius: 6px;
+            padding: 32px;
+            border: 1px solid #d4c9b8;
+        }
+        
+        .recipe-header {
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .recipe-title {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #4B3621;
+        }
+        
+        .recipe-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            color: #666;
+            font-size: 15px;
+        }
+        
+        .recipe-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #CC5500;
+            margin-bottom: 16px;
+        }
+        
+        .ingredients {
+            margin-bottom: 32px;
+        }
+        
+        .ingredient {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0ebe0;
+            display: flex;
+            font-size: 17px;
+            line-height: 1.6;
+        }
+        
+        .ingredient:last-child {
+            border-bottom: none;
+        }
+        
+        .ingredient-qty {
+            min-width: 110px;
+            color: #CC5500;
+            font-weight: 700;
+        }
+        
+        .ingredient-item {
+            color: #333;
+        }
+        
+        .instructions ol {
+            padding-left: 24px;
+        }
+        
+        .instructions li {
+            padding: 12px 0;
+            padding-left: 8px;
+            line-height: 1.8;
+            color: #333;
+            font-size: 17px;
+        }
+        
+        .instructions li::marker {
+            color: #CC5500;
+            font-weight: 700;
+        }
+        
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 48px;
+            color: #666;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #d4c9b8;
+            border-top-color: #CC5500;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .source-link {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+        
+        .source-link a {
+            color: #666;
+            font-size: 15px;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        
+        .source-link a:hover {
+            color: #CC5500;
+        }
+        
+        .custom-scale {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #d4c9b8;
+        }
+        
+        .custom-scale input {
+            width: 50px;
+            padding: 6px;
+            border: 1px solid #d4c9b8;
+            border-radius: 4px;
+            background: #F9F6EE;
+            color: #4B3621;
+            font-family: 'Cardo', Georgia, serif;
+            font-size: 15px;
+            text-align: center;
+        }
+        
+        .custom-scale input:focus {
+            outline: none;
+            border-color: #CC5500;
+        }
+        
+        .custom-scale span {
+            color: #666;
+            font-size: 15px;
+        }
+        
+        @media (max-width: 600px) {
+            body { padding: 24px 16px; }
+            h1 { font-size: 28px; }
+            .input-section { flex-direction: column; }
+            .recipe-card { padding: 24px 20px; }
+            .recipe-title { font-size: 22px; }
+            .ingredient-qty { min-width: 90px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const API_URL = 'http://localhost:5001/api';
+        
+        function formatQuantity(qty) {
+            if (qty === null || qty === undefined) return '';
+            
+            // Common fractions
+            const fractions = {
+                0.125: '⅛', 0.25: '¼', 0.333: '⅓', 0.375: '⅜',
+                0.5: '½', 0.625: '⅝', 0.666: '⅔', 0.75: '¾', 0.875: '⅞'
+            };
+            
+            const whole = Math.floor(qty);
+            const decimal = qty - whole;
+            
+            // Check for close fraction match
+            for (const [val, symbol] of Object.entries(fractions)) {
+                if (Math.abs(decimal - parseFloat(val)) < 0.02) {
+                    return whole > 0 ? `${whole} ${symbol}` : symbol;
+                }
+            }
+            
+            // Otherwise show decimal
+            if (qty === Math.floor(qty)) return qty.toString();
+            return qty.toFixed(2).replace(/\.?0+$/, '');
+        }
+        
+        function App() {
+            const [url, setUrl] = React.useState('');
+            const [originalRecipe, setOriginalRecipe] = React.useState(null);
+            const [recipe, setRecipe] = React.useState(null);
+            const [loading, setLoading] = React.useState(false);
+            const [error, setError] = React.useState(null);
+            const [customScale, setCustomScale] = React.useState('1');
+            const [currentScale, setCurrentScale] = React.useState(1);
+            
+            const scrapeRecipe = async () => {
+                if (!url.trim()) return;
+                
+                setLoading(true);
+                setError(null);
+                
+                try {
+                    const res = await fetch(`${API_URL}/scrape`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Failed to scrape recipe');
+                    }
+                    
+                    setOriginalRecipe(data);
+                    setRecipe(data);
+                    setCurrentScale(1);
+                    setCustomScale('1');
+                    setCurrentUnit('original');
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            const scaleFromOriginal = (factor) => {
+                if (!originalRecipe) return;
+                
+                // Scale ingredients from original
+                const scaledIngredients = originalRecipe.ingredients.map(ing => ({
+                    ...ing,
+                    quantity: ing.quantity ? ing.quantity * factor : null
+                }));
+                
+                const scaledServings = originalRecipe.servings 
+                    ? Math.round(originalRecipe.servings * factor) 
+                    : null;
+                
+                setRecipe({
+                    ...originalRecipe,
+                    ingredients: scaledIngredients,
+                    servings: scaledServings
+                });
+                setCurrentScale(factor);
+                setCustomScale(factor.toString());
+            };
+            
+            // Unit conversion tables
+            const VOLUME_TO_ML = {
+                ml: 1, milliliter: 1, milliliters: 1,
+                l: 1000, liter: 1000, liters: 1000,
+                tsp: 4.929, teaspoon: 4.929, teaspoons: 4.929,
+                tbsp: 14.787, tablespoon: 14.787, tablespoons: 14.787,
+                cup: 236.588, cups: 236.588,
+                'fl oz': 29.574, 'fluid ounce': 29.574, 'fluid ounces': 29.574,
+                pint: 473.176, pints: 473.176,
+                quart: 946.353, quarts: 946.353,
+                gallon: 3785.41, gallons: 3785.41,
+            };
+            
+            const WEIGHT_TO_G = {
+                g: 1, gram: 1, grams: 1,
+                kg: 1000, kilogram: 1000, kilograms: 1000,
+                oz: 28.3495, ounce: 28.3495, ounces: 28.3495,
+                lb: 453.592, pound: 453.592, pounds: 453.592,
+            };
+            
+            const convertUnit = (quantity, fromUnit, toUnit) => {
+                if (!quantity || !fromUnit) return { quantity, unit: fromUnit };
+                const from = fromUnit.toLowerCase();
+                const to = toUnit.toLowerCase();
+                
+                // Volume conversion
+                if (VOLUME_TO_ML[from] && VOLUME_TO_ML[to]) {
+                    const ml = quantity * VOLUME_TO_ML[from];
+                    return { quantity: ml / VOLUME_TO_ML[to], unit: toUnit };
+                }
+                // Weight conversion
+                if (WEIGHT_TO_G[from] && WEIGHT_TO_G[to]) {
+                    const g = quantity * WEIGHT_TO_G[from];
+                    return { quantity: g / WEIGHT_TO_G[to], unit: toUnit };
+                }
+                return { quantity, unit: fromUnit };
+            };
+            
+            const convertRecipeUnits = (system) => {
+                if (!originalRecipe) return;
+                
+                const convertedIngredients = originalRecipe.ingredients.map(ing => {
+                    if (!ing.quantity || !ing.unit) return { ...ing, quantity: ing.quantity ? ing.quantity * currentScale : null };
+                    
+                    const u = ing.unit.toLowerCase();
+                    let converted = { quantity: ing.quantity, unit: ing.unit };
+                    
+                    if (system === 'metric') {
+                        if (VOLUME_TO_ML[u] && !['ml', 'l', 'liter', 'liters'].includes(u)) {
+                            converted = convertUnit(ing.quantity, ing.unit, 'ml');
+                            if (converted.quantity >= 1000) {
+                                converted = { quantity: converted.quantity / 1000, unit: 'L' };
+                            }
+                        } else if (WEIGHT_TO_G[u] && !['g', 'kg', 'gram', 'grams', 'kilogram', 'kilograms'].includes(u)) {
+                            converted = convertUnit(ing.quantity, ing.unit, 'g');
+                            if (converted.quantity >= 1000) {
+                                converted = { quantity: converted.quantity / 1000, unit: 'kg' };
+                            }
+                        }
+                    } else {
+                        // Imperial
+                        if (['ml', 'l', 'liter', 'liters'].includes(u)) {
+                            converted = convertUnit(ing.quantity, ing.unit, 'cups');
+                        } else if (['g', 'kg', 'gram', 'grams', 'kilogram', 'kilograms'].includes(u)) {
+                            converted = convertUnit(ing.quantity, ing.unit, 'oz');
+                        }
+                    }
+                    
+                    // Apply current scale
+                    return {
+                        ...ing,
+                        quantity: converted.quantity ? converted.quantity * currentScale : null,
+                        unit: converted.unit
+                    };
+                });
+                
+                setRecipe({
+                    ...recipe,
+                    ingredients: convertedIngredients
+                });
+                setCurrentUnit(system);
+            };
+            
+            const [currentUnit, setCurrentUnit] = React.useState('original');
+            
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter') scrapeRecipe();
+            };
+            
+            const handleCustomScale = () => {
+                const factor = parseFloat(customScale);
+                if (!isNaN(factor) && factor > 0) {
+                    scaleFromOriginal(factor);
+                }
+            };
+            
+            const resetRecipe = () => {
+                if (originalRecipe) {
+                    setRecipe(originalRecipe);
+                    setCurrentScale(1);
+                    setCustomScale('1');
+                    setCurrentUnit('original');
+                }
+            };
+            
+            return (
+                <div className="container">
+                    <h1>what are you cooking up?</h1>
+                    <p className="subtitle">paste a recipe URL to extract, scale, and convert</p>
+                    
+                    <div className="input-section">
+                        <input
+                            type="text"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="https://www.allrecipes.com/recipe/..."
+                        />
+                        <button 
+                            className="btn-primary" 
+                            onClick={scrapeRecipe}
+                            disabled={loading || !url.trim()}
+                        >
+                            {loading ? 'Loading...' : 'Extract'}
+                        </button>
+                    </div>
+                    
+                    {error && <div className="error">{error}</div>}
+                    
+                    {loading && (
+                        <div className="loading">
+                            <div className="loading-spinner"></div>
+                            <p style={{marginTop: '1rem'}}>Extracting recipe...</p>
+                        </div>
+                    )}
+                    
+                    {recipe && !loading && (
+                        <>
+                            <div className="controls">
+                                <button className={`btn-secondary ${currentScale === 0.5 ? 'active' : ''}`} onClick={() => scaleFromOriginal(0.5)}>½×</button>
+                                <button className={`btn-secondary ${currentScale === 1 ? 'active' : ''}`} onClick={resetRecipe}>1× (reset)</button>
+                                <button className={`btn-secondary ${currentScale === 2 ? 'active' : ''}`} onClick={() => scaleFromOriginal(2)}>2×</button>
+                                <button className={`btn-secondary ${currentScale === 3 ? 'active' : ''}`} onClick={() => scaleFromOriginal(3)}>3×</button>
+                                <div className="custom-scale">
+                                    <input 
+                                        type="text" 
+                                        value={customScale}
+                                        onChange={(e) => setCustomScale(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCustomScale()}
+                                    />
+                                    <span>×</span>
+                                    <button className="btn-secondary" onClick={handleCustomScale}>Scale</button>
+                                </div>
+                                <span style={{color: '#999', margin: '0 4px'}}>|</span>
+                                <button className={`btn-secondary ${currentUnit === 'original' ? 'active' : ''}`} onClick={() => { scaleFromOriginal(currentScale); setCurrentUnit('original'); }}>Original</button>
+                                <button className={`btn-secondary ${currentUnit === 'metric' ? 'active' : ''}`} onClick={() => convertRecipeUnits('metric')}>Metric</button>
+                                <button className={`btn-secondary ${currentUnit === 'imperial' ? 'active' : ''}`} onClick={() => convertRecipeUnits('imperial')}>Imperial</button>
+                            </div>
+                            
+                            <div className="recipe-card">
+                                <div className="recipe-header">
+                                    <h2 className="recipe-title">{recipe.name}</h2>
+                                    <div className="recipe-meta">
+                                        {recipe.servings && <span>🍽 {recipe.servings} servings</span>}
+                                        {recipe.prep_time && <span>⏱ Prep: {recipe.prep_time}</span>}
+                                        {recipe.cook_time && <span>🔥 Cook: {recipe.cook_time}</span>}
+                                        {recipe.total_time && <span>⏰ Total: {recipe.total_time}</span>}
+                                    </div>
+                                </div>
+                                
+                                <div className="ingredients">
+                                    <h3 className="section-title">Ingredients</h3>
+                                    {recipe.ingredients.map((ing, i) => (
+                                        <div key={i} className="ingredient">
+                                            <span className="ingredient-qty">
+                                                {formatQuantity(ing.quantity)} {ing.unit || ''}
+                                            </span>
+                                            <span className="ingredient-item">{ing.item}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="instructions">
+                                    <h3 className="section-title">Instructions</h3>
+                                    {currentScale !== 1 && (
+                                        <p style={{fontSize: '14px', color: '#888', fontStyle: 'italic', marginBottom: '16px'}}>
+                                            Note: quantities in instructions are not adjusted for scaling.
+                                        </p>
+                                    )}
+                                    <ol>
+                                        {recipe.instructions.map((step, i) => (
+                                            <li key={i}>{step}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                                
+                                {recipe.source_url && (
+                                    <div className="source-link">
+                                        <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">
+                                            View original recipe ↗
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        }
+        
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
