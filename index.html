@@ -341,13 +341,14 @@
             if (!text || toUnit === 'original') return text;
             
             // If text already contains both C and F temperatures, don't convert
-            const hasC = /\d+\s*°?\s*[Cc](?:elsius)?/i.test(text);
-            const hasF = /\d+\s*°?\s*[Ff](?:ahrenheit)?/i.test(text);
+            const hasC = /\d+\s*[°º]?\s*[Cc](?:elsius)?/i.test(text);
+            const hasF = /\d+\s*[°º]?\s*[Ff](?:ahrenheit)?/i.test(text);
             if (hasC && hasF) return text;
             
             // Match temperatures like "180°C", "350°F", "180C", "350F", "180 °C", "180 degrees C"
-            const celsiusPattern = /(\d+)\s*°?\s*(?:degrees?\s*)?[Cc](?:elsius)?(?!\w)/g;
-            const fahrenheitPattern = /(\d+)\s*°?\s*(?:degrees?\s*)?[Ff](?:ahrenheit)?(?!\w)/g;
+            // Note: º (ordinal) and ° (degree) are different characters - match both
+            const celsiusPattern = /(\d+)\s*[°º]?\s*(?:degrees?\s*)?[Cc](?:elsius)?(?!\w)/g;
+            const fahrenheitPattern = /(\d+)\s*[°º]?\s*(?:degrees?\s*)?[Ff](?:ahrenheit)?(?!\w)/g;
             
             if (toUnit === 'fahrenheit') {
                 // Convert C to F
