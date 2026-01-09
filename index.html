@@ -575,6 +575,68 @@
             const [cookMode, setCookMode] = React.useState(false);
             const [currentStep, setCurrentStep] = React.useState(0);
             const [checkedIngredients, setCheckedIngredients] = React.useState({});
+            const [wakeLock, setWakeLock] = React.useState(null);
+            
+            // Wake lock to prevent screen from sleeping in cook mode
+            React.useEffect(() => {
+                const requestWakeLock = async () => {
+                    if (cookMode && 'wakeLock' in navigator) {
+                        try {
+                            const lock = await navigator.wakeLock.request('screen');
+                            setWakeLock(lock);
+                            console.log('Screen wake lock activated');
+                        } catch (err) {
+                            console.log('Wake lock failed:', err);
+                        }
+                    }
+                };
+                
+                const releaseWakeLock = async () => {
+                    if (wakeLock) {
+                        await wakeLock.release();
+                        setWakeLock(null);
+                        console.log('Screen wake lock released');
+                    }
+                };
+                
+                if (cookMode) {
+                    requestWakeLock();
+                } else {
+                    releaseWakeLock();
+                }
+                
+                return () => releaseWakeLock();
+            }, [cookMode]);
+            
+            // Keyboard shortcuts for cook mode
+            React.useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (!cookMode || !recipe) return;
+                    
+                    // Right arrow, Space, or Enter = next step
+                    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        if (currentStep < recipe.instructions.length - 1) {
+                            setCurrentStep(currentStep + 1);
+                        }
+                    }
+                    // Left arrow = previous step
+                    if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        if (currentStep > 0) {
+                            setCurrentStep(currentStep - 1);
+                        }
+                    }
+                    // Escape = exit cook mode
+                    if (e.key === 'Escape') {
+                        setCookMode(false);
+                        setCurrentStep(0);
+                    }
+                };
+                
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [cookMode, currentStep, recipe]);
             
             const shoppingInputRef = React.useRef(null);
             
@@ -735,7 +797,7 @@
                                 </div>
                                 
                                 <div className="ingredients">
-                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
                                         <h3 className="section-title" style={{margin: 0}}>Ingredients</h3>
                                         <div style={{display: 'flex', gap: '8px'}}>
                                             {Object.keys(checkedIngredients).length > 0 && (
@@ -768,27 +830,60 @@
                                             </button>
                                         </div>
                                     </div>
+                                    <p style={{fontSize: '13px', color: '#999', marginBottom: '12px'}}>
+                                        tap items to check off what you have
+                                    </p>
+                                    {/* Unchecked ingredients first */}
                                     {recipe.ingredients.map((ing, i) => (
-                                        <div 
-                                            key={i} 
-                                            className="ingredient"
-                                            onClick={() => setCheckedIngredients(prev => ({...prev, [i]: !prev[i]}))}
-                                            style={{
-                                                cursor: 'pointer',
-                                                opacity: checkedIngredients[i] ? 0.4 : 1,
-                                                textDecoration: checkedIngredients[i] ? 'line-through' : 'none',
-                                                transition: 'opacity 0.2s'
-                                            }}
-                                        >
-                                            <span className="ingredient-qty" style={{textDecoration: checkedIngredients[i] ? 'line-through' : 'none'}}>
-                                                {formatQuantity(ing.quantity)} {ing.unit || ''}
-                                            </span>
-                                            <span className="ingredient-item">{ing.item}</span>
-                                            <span style={{marginLeft: 'auto', color: checkedIngredients[i] ? '#4CAF50' : '#ddd'}}>
-                                                {checkedIngredients[i] ? '✓' : '○'}
-                                            </span>
-                                        </div>
+                                        !checkedIngredients[i] && (
+                                            <div 
+                                                key={i} 
+                                                className="ingredient"
+                                                onClick={() => setCheckedIngredients(prev => ({...prev, [i]: true}))}
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    transition: 'opacity 0.2s'
+                                                }}
+                                            >
+                                                <span className="ingredient-qty">
+                                                    {formatQuantity(ing.quantity)} {ing.unit || ''}
+                                                </span>
+                                                <span className="ingredient-item">{ing.item}</span>
+                                                <span style={{marginLeft: 'auto', color: '#ddd'}}>○</span>
+                                            </div>
+                                        )
                                     ))}
+                                    {/* Checked ingredients at bottom */}
+                                    {Object.keys(checkedIngredients).length > 0 && recipe.ingredients.some((_, i) => checkedIngredients[i]) && (
+                                        <div style={{marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #ddd'}}>
+                                            <div style={{fontSize: '13px', color: '#888', marginBottom: '8px'}}>Have these:</div>
+                                            {recipe.ingredients.map((ing, i) => (
+                                                checkedIngredients[i] && (
+                                                    <div 
+                                                        key={i} 
+                                                        className="ingredient"
+                                                        onClick={() => setCheckedIngredients(prev => {
+                                                            const next = {...prev};
+                                                            delete next[i];
+                                                            return next;
+                                                        })}
+                                                        style={{
+                                                            cursor: 'pointer',
+                                                            opacity: 0.4,
+                                                            textDecoration: 'line-through',
+                                                            transition: 'opacity 0.2s'
+                                                        }}
+                                                    >
+                                                        <span className="ingredient-qty" style={{textDecoration: 'line-through'}}>
+                                                            {formatQuantity(ing.quantity)} {ing.unit || ''}
+                                                        </span>
+                                                        <span className="ingredient-item">{ing.item}</span>
+                                                        <span style={{marginLeft: 'auto', color: '#4CAF50'}}>✓</span>
+                                                    </div>
+                                                )
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 <div className="instructions">
@@ -816,7 +911,7 @@
                                             <p style={{fontSize: '20px', lineHeight: '1.7', color: '#333', marginBottom: '24px'}}>
                                                 {recipe.instructions[currentStep]}
                                             </p>
-                                            <div style={{display: 'flex', gap: '12px'}}>
+                                            <div style={{display: 'flex', gap: '12px', marginBottom: '16px'}}>
                                                 <button 
                                                     className="btn-secondary"
                                                     onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
@@ -842,6 +937,9 @@
                                                         🎉 Finished!
                                                     </button>
                                                 )}
+                                            </div>
+                                            <div style={{fontSize: '12px', color: '#aaa'}}>
+                                                Keyboard: ←/→ or Space to navigate • Esc to exit • Screen stays on
                                             </div>
                                         </div>
                                     ) : (
