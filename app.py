@@ -41,7 +41,13 @@ def scrape_recipe():
     
     try:
         current_recipe = scraper.scrape(url)
-        return jsonify(current_recipe.to_dict())
+        result = current_recipe.to_dict()
+        
+        # Consolidate duplicate ingredients (e.g., salt mentioned 3 times)
+        if result.get('ingredients'):
+            result['ingredients'] = consolidate_ingredients(result['ingredients'])
+        
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
