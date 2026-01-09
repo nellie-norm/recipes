@@ -868,14 +868,26 @@ class RecipeScraper:
             
             # Look for method/instructions heading
             if any(word in heading_text for word in ['method', 'instruction', 'direction', 'preparation', 'steps']) and not instructions:
-                # Find the next list after this heading
-                next_elem = heading.find_next(['ul', 'ol'])
-                # Make sure we don't use the same list as ingredients
-                if next_elem and next_elem != ingredients_list_elem:
-                    for li in next_elem.find_all('li', recursive=False):
-                        text = self._clean_html_text(li.get_text(strip=True))
-                        if text:
-                            instructions.append(text)
+                # Collect ALL list items after this heading until we hit another major heading
+                # This handles lists interrupted by images (common in Substack)
+                current = heading.find_next()
+                stop_words = ['note', 'tip', 'serve', 'storage', 'nutrition', 'comment', 'discussion', 'subscribe']
+                
+                while current:
+                    # Stop if we hit another major heading
+                    if current.name in ['h1', 'h2', 'h3']:
+                        heading_content = current.get_text(strip=True).lower()
+                        if any(word in heading_content for word in stop_words):
+                            break
+                    
+                    # If it's a list, grab all items
+                    if current.name in ['ul', 'ol'] and current != ingredients_list_elem:
+                        for li in current.find_all('li', recursive=False):
+                            text = self._clean_html_text(li.get_text(strip=True))
+                            if text and len(text) > 20:  # Skip very short items
+                                instructions.append(text)
+                    
+                    current = current.find_next()
         
         return ingredients, instructions
     
