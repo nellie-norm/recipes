@@ -307,7 +307,7 @@
     <div id="root"></div>
     
     <script type="text/babel">
-        const API_URL = 'http://localhost:5001/api';
+        const API_URL = '/api';
         
         function formatQuantity(qty) {
             if (qty === null || qty === undefined) return '';
@@ -370,6 +370,9 @@
                     setCurrentScale(1);
                     setCustomScale('1');
                     setCurrentUnit('original');
+                    setCookMode(false);
+                    setCurrentStep(0);
+                    setCheckedIngredients({});
                 } catch (err) {
                     setError(err.message);
                 } finally {
@@ -407,6 +410,9 @@
                     setCurrentScale(1);
                     setCustomScale('1');
                     setCurrentUnit('original');
+                    setCookMode(false);
+                    setCurrentStep(0);
+                    setCheckedIngredients({});
                 } catch (err) {
                     setError(err.message);
                 } finally {
@@ -566,6 +572,9 @@
             const [copied, setCopied] = React.useState(false);
             const [shoppingList, setShoppingList] = React.useState(null);
             const [showShoppingList, setShowShoppingList] = React.useState(false);
+            const [cookMode, setCookMode] = React.useState(false);
+            const [currentStep, setCurrentStep] = React.useState(0);
+            const [checkedIngredients, setCheckedIngredients] = React.useState({});
             
             const shoppingInputRef = React.useRef(null);
             
@@ -586,6 +595,9 @@
                     setCurrentScale(1);
                     setCustomScale('1');
                     setCurrentUnit('original');
+                    setCookMode(false);
+                    setCurrentStep(0);
+                    setCheckedIngredients({});
                 }
             };
             
@@ -725,47 +737,120 @@
                                 <div className="ingredients">
                                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
                                         <h3 className="section-title" style={{margin: 0}}>Ingredients</h3>
-                                        <button 
-                                            className="btn-secondary" 
-                                            onClick={() => {
-                                                const text = recipe.ingredients
-                                                    .map(ing => {
-                                                        const qty = ing.quantity ? formatQuantity(ing.quantity) : '';
-                                                        const unit = ing.unit || '';
-                                                        return `${qty} ${unit} ${ing.item}`.trim();
-                                                    })
-                                                    .join('\n');
-                                                navigator.clipboard.writeText(text);
-                                                setCopied(true);
-                                                setTimeout(() => setCopied(false), 2000);
-                                            }}
-                                            style={{padding: '6px 12px', fontSize: '14px'}}
-                                        >
-                                            {copied ? '✓ Copied!' : '📋 Copy'}
-                                        </button>
+                                        <div style={{display: 'flex', gap: '8px'}}>
+                                            {Object.keys(checkedIngredients).length > 0 && (
+                                                <button 
+                                                    className="btn-secondary" 
+                                                    onClick={() => setCheckedIngredients({})}
+                                                    style={{padding: '6px 12px', fontSize: '14px'}}
+                                                >
+                                                    ↩ Reset
+                                                </button>
+                                            )}
+                                            <button 
+                                                className="btn-secondary" 
+                                                onClick={() => {
+                                                    const text = recipe.ingredients
+                                                        .filter((_, i) => !checkedIngredients[i])
+                                                        .map(ing => {
+                                                            const qty = ing.quantity ? formatQuantity(ing.quantity) : '';
+                                                            const unit = ing.unit || '';
+                                                            return `${qty} ${unit} ${ing.item}`.trim();
+                                                        })
+                                                        .join('\n');
+                                                    navigator.clipboard.writeText(text);
+                                                    setCopied(true);
+                                                    setTimeout(() => setCopied(false), 2000);
+                                                }}
+                                                style={{padding: '6px 12px', fontSize: '14px'}}
+                                            >
+                                                {copied ? '✓ Copied!' : '📋 Copy'}
+                                            </button>
+                                        </div>
                                     </div>
                                     {recipe.ingredients.map((ing, i) => (
-                                        <div key={i} className="ingredient">
-                                            <span className="ingredient-qty">
+                                        <div 
+                                            key={i} 
+                                            className="ingredient"
+                                            onClick={() => setCheckedIngredients(prev => ({...prev, [i]: !prev[i]}))}
+                                            style={{
+                                                cursor: 'pointer',
+                                                opacity: checkedIngredients[i] ? 0.4 : 1,
+                                                textDecoration: checkedIngredients[i] ? 'line-through' : 'none',
+                                                transition: 'opacity 0.2s'
+                                            }}
+                                        >
+                                            <span className="ingredient-qty" style={{textDecoration: checkedIngredients[i] ? 'line-through' : 'none'}}>
                                                 {formatQuantity(ing.quantity)} {ing.unit || ''}
                                             </span>
                                             <span className="ingredient-item">{ing.item}</span>
+                                            <span style={{marginLeft: 'auto', color: checkedIngredients[i] ? '#4CAF50' : '#ddd'}}>
+                                                {checkedIngredients[i] ? '✓' : '○'}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
                                 
                                 <div className="instructions">
-                                    <h3 className="section-title">Instructions</h3>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+                                        <h3 className="section-title" style={{margin: 0}}>Instructions</h3>
+                                        <button 
+                                            className="btn-secondary"
+                                            onClick={() => { setCookMode(!cookMode); setCurrentStep(0); }}
+                                            style={{padding: '6px 12px', fontSize: '14px'}}
+                                        >
+                                            {cookMode ? '📖 View All' : '👨‍🍳 Cook Mode'}
+                                        </button>
+                                    </div>
                                     {currentScale !== 1 && (
                                         <p style={{fontSize: '14px', color: '#888', fontStyle: 'italic', marginBottom: '16px'}}>
                                             Note: quantities in instructions are not adjusted for scaling.
                                         </p>
                                     )}
-                                    <ol>
+                                    
+                                    {cookMode ? (
+                                        <div style={{padding: '20px', background: '#f9f6ee', borderRadius: '8px'}}>
+                                            <div style={{fontSize: '14px', color: '#888', marginBottom: '12px'}}>
+                                                Step {currentStep + 1} of {recipe.instructions.length}
+                                            </div>
+                                            <p style={{fontSize: '20px', lineHeight: '1.7', color: '#333', marginBottom: '24px'}}>
+                                                {recipe.instructions[currentStep]}
+                                            </p>
+                                            <div style={{display: 'flex', gap: '12px'}}>
+                                                <button 
+                                                    className="btn-secondary"
+                                                    onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                                                    disabled={currentStep === 0}
+                                                    style={{padding: '10px 20px'}}
+                                                >
+                                                    ← Back
+                                                </button>
+                                                {currentStep < recipe.instructions.length - 1 ? (
+                                                    <button 
+                                                        className="btn-primary"
+                                                        onClick={() => setCurrentStep(currentStep + 1)}
+                                                        style={{padding: '10px 20px'}}
+                                                    >
+                                                        Done, Next →
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        className="btn-primary"
+                                                        onClick={() => { setCookMode(false); setCurrentStep(0); }}
+                                                        style={{padding: '10px 20px'}}
+                                                    >
+                                                        🎉 Finished!
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <ol>
                                         {recipe.instructions.map((step, i) => (
                                             <li key={i}>{step}</li>
                                         ))}
                                     </ol>
+                                    )}
                                 </div>
                                 
                                 {recipe.source_url && (
