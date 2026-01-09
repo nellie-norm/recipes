@@ -293,92 +293,6 @@
             font-size: 15px;
         }
         
-        /* Dark mode */
-        body.dark-mode {
-            background: #1a1a1a;
-            color: #e0e0e0;
-        }
-        
-        body.dark-mode .recipe-card {
-            background: #2a2a2a;
-            border-color: #444;
-        }
-        
-        body.dark-mode .subtitle {
-            color: #999;
-        }
-        
-        body.dark-mode input[type="text"] {
-            background: #2a2a2a;
-            border-color: #444;
-            color: #e0e0e0;
-        }
-        
-        body.dark-mode input[type="text"]:focus {
-            border-color: #CC5500;
-        }
-        
-        body.dark-mode .btn-secondary {
-            background: #333;
-            color: #e0e0e0;
-            border-color: #555;
-        }
-        
-        body.dark-mode .btn-secondary:hover {
-            background: #444;
-        }
-        
-        body.dark-mode .btn-secondary.active {
-            background: #CC5500;
-            color: white;
-            border-color: #CC5500;
-        }
-        
-        body.dark-mode .ingredient {
-            border-bottom-color: #444;
-        }
-        
-        body.dark-mode .ingredient-qty {
-            color: #CC5500;
-        }
-        
-        body.dark-mode .section-title {
-            color: #CC5500;
-        }
-        
-        body.dark-mode .recipe-meta span {
-            color: #888;
-        }
-        
-        body.dark-mode .source-link a {
-            color: #999;
-        }
-        
-        body.dark-mode ol li {
-            color: #ccc;
-        }
-        
-        body.dark-mode ol li::marker {
-            color: #CC5500;
-        }
-        
-        .dark-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            opacity: 0.6;
-            transition: opacity 0.2s;
-            z-index: 100;
-        }
-        
-        .dark-toggle:hover {
-            opacity: 1;
-        }
-        
         @media (max-width: 600px) {
             body { padding: 24px 16px; }
             h1 { font-size: 28px; }
@@ -386,7 +300,6 @@
             .recipe-card { padding: 24px 20px; }
             .recipe-title { font-size: 22px; }
             .ingredient-qty { min-width: 90px; }
-            .dark-toggle { top: 10px; right: 10px; }
         }
     </style>
 </head>
@@ -426,6 +339,11 @@
         
         function convertTemperatureInText(text, toUnit) {
             if (!text || toUnit === 'original') return text;
+            
+            // If text already contains both C and F temperatures, don't convert
+            const hasC = /\d+\s*°?\s*[Cc](?:elsius)?/i.test(text);
+            const hasF = /\d+\s*°?\s*[Ff](?:ahrenheit)?/i.test(text);
+            if (hasC && hasF) return text;
             
             // Match temperatures like "180°C", "350°F", "180C", "350F", "180 °C", "180 degrees C"
             const celsiusPattern = /(\d+)\s*°?\s*(?:degrees?\s*)?[Cc](?:elsius)?(?!\w)/g;
@@ -784,12 +702,6 @@
             
             const [tempUnit, setTempUnit] = React.useState('original'); // 'original', 'celsius', 'fahrenheit'
             const [currentUnit, setCurrentUnit] = React.useState('original');
-            const [darkMode, setDarkMode] = React.useState(() => {
-                // Check localStorage or system preference
-                const saved = localStorage.getItem('darkMode');
-                if (saved !== null) return saved === 'true';
-                return window.matchMedia('(prefers-color-scheme: dark)').matches;
-            });
             const [copied, setCopied] = React.useState(false);
             const [shoppingList, setShoppingList] = React.useState(null);
             const [showShoppingList, setShowShoppingList] = React.useState(false);
@@ -799,12 +711,6 @@
             const [wakeLock, setWakeLock] = React.useState(null);
             const [activeTimer, setActiveTimer] = React.useState(null);
             const timerRef = React.useRef(null);
-            
-            // Dark mode effect
-            React.useEffect(() => {
-                document.body.classList.toggle('dark-mode', darkMode);
-                localStorage.setItem('darkMode', darkMode);
-            }, [darkMode]);
             
             // Timer functions
             const startTimer = (seconds, label) => {
@@ -939,13 +845,6 @@
             
             return (
                 <div className="container">
-                    <button 
-                        className="dark-toggle" 
-                        onClick={() => setDarkMode(!darkMode)}
-                        title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                    >
-                        {darkMode ? '☀️' : '🌙'}
-                    </button>
                     <h1>what are you cooking up?</h1>
                     <p className="subtitle">paste a URL, upload a photo, or combine multiple recipes into a shopping list</p>
                     
