@@ -750,22 +750,26 @@ class RecipeScraper:
         ingredients = []
         instructions = []
         
-        # Method 1: Look for tables (Ottolenghi-style)
-        for table in soup.find_all('table'):
-            rows = table.find_all('tr')
-            for row in rows:
-                cells = row.find_all(['td', 'th'])
-                if len(cells) >= 2:
-                    qty_text = cells[0].get_text(strip=True)
-                    item_text = cells[1].get_text(strip=True)
-                    if item_text and not item_text.isupper():  # Skip headers like "BROTH"
-                        combined = f"{qty_text} {item_text}".strip()
-                        if combined:
-                            parsed = self._parse_ingredient(combined)
-                            if parsed:  # Skip None (filtered headers/notes)
-                                ingredients.append(parsed)
+        # Method 1: Look for heading-based recipes (Substack, blogs)
+        ingredients, instructions = self._extract_from_headings(soup)
         
-        # Method 2: Look for ingredient lists (ul/ol)
+        # Method 2: Look for tables (Ottolenghi-style)
+        if not ingredients:
+            for table in soup.find_all('table'):
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 2:
+                        qty_text = cells[0].get_text(strip=True)
+                        item_text = cells[1].get_text(strip=True)
+                        if item_text and not item_text.isupper():  # Skip headers like "BROTH"
+                            combined = f"{qty_text} {item_text}".strip()
+                            if combined:
+                                parsed = self._parse_ingredient(combined)
+                                if parsed:  # Skip None (filtered headers/notes)
+                                    ingredients.append(parsed)
+        
+        # Method 3: Look for ingredient lists (ul/ol)
         if not ingredients:
             for ul in soup.find_all(['ul', 'ol']):
                 items = ul.find_all('li')
@@ -778,18 +782,19 @@ class RecipeScraper:
                                 ingredients.append(parsed)
                     break
         
-        # Look for instructions in ordered lists
-        for ol in soup.find_all('ol'):
-            items = ol.find_all('li')
-            if items and len(items) >= 2:
-                potential_instructions = []
-                for li in items:
-                    text = li.get_text(strip=True)
-                    if text and len(text) > 30:  # Instructions are usually longer
-                        potential_instructions.append(text)
-                if potential_instructions:
-                    instructions = potential_instructions
-                    break
+        # Look for instructions in ordered lists (if not found from headings)
+        if not instructions:
+            for ol in soup.find_all('ol'):
+                items = ol.find_all('li')
+                if items and len(items) >= 2:
+                    potential_instructions = []
+                    for li in items:
+                        text = self._clean_html_text(li.get_text(strip=True))
+                        if text and len(text) > 30:  # Instructions are usually longer
+                            potential_instructions.append(text)
+                    if potential_instructions:
+                        instructions = potential_instructions
+                        break
         
         # Extract servings/time from meta info if available
         servings = None
@@ -834,6 +839,41 @@ class RecipeScraper:
                 matches += 1
         
         return matches >= 2
+    
+    def _extract_from_headings(self, soup: BeautifulSoup):
+        """Extract ingredients and instructions from heading-based structure (blogs, Substack)."""
+        ingredients = []
+        instructions = []
+        
+        # Find all potential headings including bold/strong text (common in Substack)
+        headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b', 'p'])
+        
+        for heading in headings:
+            heading_text = heading.get_text(strip=True).lower()
+            
+            # Look for ingredients heading
+            if 'ingredient' in heading_text and not ingredients:
+                # Find the next list after this heading
+                next_elem = heading.find_next(['ul', 'ol'])
+                if next_elem:
+                    for li in next_elem.find_all('li', recursive=False):
+                        text = li.get_text(strip=True)
+                        if text:
+                            parsed = self._parse_ingredient(text)
+                            if parsed:
+                                ingredients.append(parsed)
+            
+            # Look for method/instructions heading
+            if any(word in heading_text for word in ['method', 'instruction', 'direction', 'preparation', 'steps']) and not instructions:
+                # Find the next list after this heading
+                next_elem = heading.find_next(['ul', 'ol'])
+                if next_elem:
+                    for li in next_elem.find_all('li', recursive=False):
+                        text = self._clean_html_text(li.get_text(strip=True))
+                        if text:
+                            instructions.append(text)
+        
+        return ingredients, instructions
     
     def _ingredients_look_valid(self, ingredients: list) -> bool:
         """Check if parsed ingredients actually look like ingredients, not instructions."""
