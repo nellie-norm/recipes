@@ -790,7 +790,8 @@ class RecipeScraper:
                     potential_instructions = []
                     for li in items:
                         text = self._clean_html_text(li.get_text(strip=True))
-                        if text and len(text) > 30:  # Instructions are usually longer
+                        # Instructions are usually longer and don't start with quantities
+                        if text and len(text) > 50 and not re.match(r'^\d+\s*g\b', text):
                             potential_instructions.append(text)
                     if potential_instructions:
                         instructions = potential_instructions
@@ -844,9 +845,10 @@ class RecipeScraper:
         """Extract ingredients and instructions from heading-based structure (blogs, Substack)."""
         ingredients = []
         instructions = []
+        ingredients_list_elem = None  # Track which list element has ingredients
         
         # Find all potential headings including bold/strong text (common in Substack)
-        headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b', 'p'])
+        headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b'])
         
         for heading in headings:
             heading_text = heading.get_text(strip=True).lower()
@@ -856,6 +858,7 @@ class RecipeScraper:
                 # Find the next list after this heading
                 next_elem = heading.find_next(['ul', 'ol'])
                 if next_elem:
+                    ingredients_list_elem = next_elem  # Remember this list
                     for li in next_elem.find_all('li', recursive=False):
                         text = li.get_text(strip=True)
                         if text:
@@ -867,7 +870,8 @@ class RecipeScraper:
             if any(word in heading_text for word in ['method', 'instruction', 'direction', 'preparation', 'steps']) and not instructions:
                 # Find the next list after this heading
                 next_elem = heading.find_next(['ul', 'ol'])
-                if next_elem:
+                # Make sure we don't use the same list as ingredients
+                if next_elem and next_elem != ingredients_list_elem:
                     for li in next_elem.find_all('li', recursive=False):
                         text = self._clean_html_text(li.get_text(strip=True))
                         if text:
