@@ -333,6 +333,129 @@
             return qty.toFixed(2).replace(/\.?0+$/, '');
         }
         
+        // Temperature conversion functions
+        function celsiusToFahrenheit(c) { return Math.round((c * 9/5) + 32); }
+        function fahrenheitToCelsius(f) { return Math.round((f - 32) * 5/9); }
+        
+        function convertTemperatureInText(text, toUnit) {
+            if (!text || toUnit === 'original') return text;
+            
+            // Match temperatures like "180°C", "350°F", "180C", "350F", "180 °C", "180 degrees C"
+            const celsiusPattern = /(\d+)\s*°?\s*(?:degrees?\s*)?[Cc](?:elsius)?(?!\w)/g;
+            const fahrenheitPattern = /(\d+)\s*°?\s*(?:degrees?\s*)?[Ff](?:ahrenheit)?(?!\w)/g;
+            
+            if (toUnit === 'fahrenheit') {
+                // Convert C to F
+                text = text.replace(celsiusPattern, (match, temp) => {
+                    const f = celsiusToFahrenheit(parseInt(temp));
+                    return `${f}°F`;
+                });
+            } else if (toUnit === 'celsius') {
+                // Convert F to C
+                text = text.replace(fahrenheitPattern, (match, temp) => {
+                    const c = fahrenheitToCelsius(parseInt(temp));
+                    return `${c}°C`;
+                });
+            }
+            
+            return text;
+        }
+        
+        // Extract time from instruction text
+        function extractTime(text) {
+            const patterns = [
+                /(\d+)\s*-\s*(\d+)\s*(?:minutes?|mins?)/i,  // "5-7 minutes"
+                /(\d+)\s*(?:minutes?|mins?)/i,              // "30 minutes"
+                /(\d+)\s*-\s*(\d+)\s*(?:hours?|hrs?)/i,     // "1-2 hours"
+                /(\d+)\s*(?:hours?|hrs?)/i,                 // "1 hour"
+                /(\d+)\s*-\s*(\d+)\s*(?:seconds?|secs?)/i,  // "30-45 seconds"
+                /(\d+)\s*(?:seconds?|secs?)/i,              // "30 seconds"
+            ];
+            
+            for (const pattern of patterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    const isHours = /hours?|hrs?/i.test(match[0]);
+                    const isSeconds = /seconds?|secs?/i.test(match[0]);
+                    
+                    let value;
+                    if (match[2]) {
+                        value = (parseInt(match[1]) + parseInt(match[2])) / 2;
+                    } else {
+                        value = parseInt(match[1]);
+                    }
+                    
+                    if (isHours) return { seconds: value * 3600, label: match[0] };
+                    if (isSeconds) return { seconds: value, label: match[0] };
+                    return { seconds: value * 60, label: match[0] };
+                }
+            }
+            return null;
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            if (mins >= 60) {
+                const hrs = Math.floor(mins / 60);
+                const remainMins = mins % 60;
+                return `${hrs}:${remainMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // Estimate total recipe time from instructions
+        function estimateRecipeTime(instructions) {
+            if (!instructions || !instructions.length) return null;
+            
+            let totalSeconds = 0;
+            const patterns = [
+                { regex: /(\d+)\s*-\s*(\d+)\s*(?:hours?|hrs?)/gi, unit: 3600, range: true },
+                { regex: /(\d+)\s*(?:hours?|hrs?)/gi, unit: 3600, range: false },
+                { regex: /(\d+)\s*-\s*(\d+)\s*(?:minutes?|mins?)/gi, unit: 60, range: true },
+                { regex: /(\d+)\s*(?:minutes?|mins?)/gi, unit: 60, range: false },
+                { regex: /(\d+)\s*-\s*(\d+)\s*(?:seconds?|secs?)/gi, unit: 1, range: true },
+                { regex: /(\d+)\s*(?:seconds?|secs?)/gi, unit: 1, range: false },
+            ];
+            
+            const allText = instructions.join(' ');
+            
+            // Track what we've already matched to avoid double counting
+            let matched = new Set();
+            
+            for (const { regex, unit, range } of patterns) {
+                let match;
+                while ((match = regex.exec(allText)) !== null) {
+                    const matchStr = match[0];
+                    if (matched.has(match.index)) continue;
+                    matched.add(match.index);
+                    
+                    let value;
+                    if (range && match[2]) {
+                        // Take average of range
+                        value = (parseInt(match[1]) + parseInt(match[2])) / 2;
+                    } else {
+                        value = parseInt(match[1]);
+                    }
+                    totalSeconds += value * unit;
+                }
+            }
+            
+            if (totalSeconds === 0) return null;
+            
+            // Format as human readable
+            const hours = Math.floor(totalSeconds / 3600);
+            const mins = Math.floor((totalSeconds % 3600) / 60);
+            
+            if (hours > 0 && mins > 0) {
+                return `~${hours}h ${mins}m`;
+            } else if (hours > 0) {
+                return `~${hours}h`;
+            } else {
+                return `~${mins}m`;
+            }
+        }
+        
         function App() {
             const [url, setUrl] = React.useState('');
             const [originalRecipe, setOriginalRecipe] = React.useState(null);
@@ -370,9 +493,11 @@
                     setCurrentScale(1);
                     setCustomScale('1');
                     setCurrentUnit('original');
+                    setTempUnit('original');
                     setCookMode(false);
                     setCurrentStep(0);
                     setCheckedIngredients({});
+                    stopTimer();
                 } catch (err) {
                     setError(err.message);
                 } finally {
@@ -410,9 +535,11 @@
                     setCurrentScale(1);
                     setCustomScale('1');
                     setCurrentUnit('original');
+                    setTempUnit('original');
                     setCookMode(false);
                     setCurrentStep(0);
                     setCheckedIngredients({});
+                    stopTimer();
                 } catch (err) {
                     setError(err.message);
                 } finally {
@@ -568,7 +695,7 @@
                 setCurrentUnit(system);
             };
             
-            const [currentUnit, setCurrentUnit] = React.useState('original');
+            const [tempUnit, setTempUnit] = React.useState('original'); // 'original', 'celsius', 'fahrenheit'
             const [copied, setCopied] = React.useState(false);
             const [shoppingList, setShoppingList] = React.useState(null);
             const [showShoppingList, setShowShoppingList] = React.useState(false);
@@ -576,6 +703,53 @@
             const [currentStep, setCurrentStep] = React.useState(0);
             const [checkedIngredients, setCheckedIngredients] = React.useState({});
             const [wakeLock, setWakeLock] = React.useState(null);
+            const [activeTimer, setActiveTimer] = React.useState(null);
+            const timerRef = React.useRef(null);
+            
+            // Timer functions
+            const startTimer = (seconds, label) => {
+                if (timerRef.current) clearInterval(timerRef.current);
+                
+                setActiveTimer({ total: seconds, remaining: seconds, label });
+                
+                timerRef.current = setInterval(() => {
+                    setActiveTimer(prev => {
+                        if (!prev || prev.remaining <= 1) {
+                            clearInterval(timerRef.current);
+                            timerRef.current = null;
+                            // Play alert sound
+                            try {
+                                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                                const osc = ctx.createOscillator();
+                                osc.type = 'sine';
+                                osc.frequency.value = 800;
+                                osc.connect(ctx.destination);
+                                osc.start();
+                                setTimeout(() => osc.stop(), 200);
+                                setTimeout(() => {
+                                    const osc2 = ctx.createOscillator();
+                                    osc2.type = 'sine';
+                                    osc2.frequency.value = 800;
+                                    osc2.connect(ctx.destination);
+                                    osc2.start();
+                                    setTimeout(() => osc2.stop(), 200);
+                                }, 300);
+                            } catch(e) {}
+                            alert('⏰ Timer done: ' + (prev?.label || 'Complete'));
+                            return null;
+                        }
+                        return { ...prev, remaining: prev.remaining - 1 };
+                    });
+                }, 1000);
+            };
+            
+            const stopTimer = () => {
+                if (timerRef.current) {
+                    clearInterval(timerRef.current);
+                    timerRef.current = null;
+                }
+                setActiveTimer(null);
+            };
             
             // Wake lock to prevent screen from sleeping in cook mode
             React.useEffect(() => {
@@ -657,9 +831,11 @@
                     setCurrentScale(1);
                     setCustomScale('1');
                     setCurrentUnit('original');
+                    setTempUnit('original');
                     setCookMode(false);
                     setCurrentStep(0);
                     setCheckedIngredients({});
+                    stopTimer();
                 }
             };
             
@@ -783,6 +959,9 @@
                                 <button className={`btn-secondary ${currentUnit === 'original' ? 'active' : ''}`} onClick={() => { scaleFromOriginal(currentScale); setCurrentUnit('original'); }}>Original</button>
                                 <button className={`btn-secondary ${currentUnit === 'metric' ? 'active' : ''}`} onClick={() => convertRecipeUnits('metric')}>Metric</button>
                                 <button className={`btn-secondary ${currentUnit === 'imperial' ? 'active' : ''}`} onClick={() => convertRecipeUnits('imperial')}>Imperial</button>
+                                <span style={{color: '#999', margin: '0 4px'}}>|</span>
+                                <button className={`btn-secondary ${tempUnit === 'celsius' ? 'active' : ''}`} onClick={() => setTempUnit(tempUnit === 'celsius' ? 'original' : 'celsius')}>°C</button>
+                                <button className={`btn-secondary ${tempUnit === 'fahrenheit' ? 'active' : ''}`} onClick={() => setTempUnit(tempUnit === 'fahrenheit' ? 'original' : 'fahrenheit')}>°F</button>
                             </div>
                             
                             <div className="recipe-card">
@@ -793,6 +972,9 @@
                                         {recipe.prep_time && <span>⏱ Prep: {recipe.prep_time}</span>}
                                         {recipe.cook_time && <span>🔥 Cook: {recipe.cook_time}</span>}
                                         {recipe.total_time && <span>⏰ Total: {recipe.total_time}</span>}
+                                        {!recipe.prep_time && !recipe.cook_time && !recipe.total_time && estimateRecipeTime(recipe.instructions) && (
+                                            <span title="Estimated from instructions">⏰ Est: {estimateRecipeTime(recipe.instructions)}</span>
+                                        )}
                                     </div>
                                 </div>
                                 
@@ -905,12 +1087,69 @@
                                     
                                     {cookMode ? (
                                         <div style={{padding: '20px', background: '#f9f6ee', borderRadius: '8px'}}>
+                                            {/* Active timer display */}
+                                            {activeTimer && (
+                                                <div style={{
+                                                    background: '#CC5500', 
+                                                    color: 'white', 
+                                                    padding: '12px 20px', 
+                                                    borderRadius: '8px', 
+                                                    marginBottom: '16px',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <div>
+                                                        <div style={{fontSize: '28px', fontWeight: 'bold', fontFamily: 'monospace'}}>
+                                                            {formatTime(activeTimer.remaining)}
+                                                        </div>
+                                                        <div style={{fontSize: '12px', opacity: 0.8}}>{activeTimer.label}</div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={stopTimer}
+                                                        style={{
+                                                            background: 'rgba(255,255,255,0.2)', 
+                                                            border: 'none', 
+                                                            color: 'white', 
+                                                            padding: '8px 16px', 
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        ✕ Cancel
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
                                             <div style={{fontSize: '14px', color: '#888', marginBottom: '12px'}}>
                                                 Step {currentStep + 1} of {recipe.instructions.length}
                                             </div>
-                                            <p style={{fontSize: '20px', lineHeight: '1.7', color: '#333', marginBottom: '24px'}}>
-                                                {recipe.instructions[currentStep]}
+                                            <p style={{fontSize: '20px', lineHeight: '1.7', color: '#333', marginBottom: '16px'}}>
+                                                {convertTemperatureInText(recipe.instructions[currentStep], tempUnit)}
                                             </p>
+                                            
+                                            {/* Timer button if time detected */}
+                                            {extractTime(recipe.instructions[currentStep]) && !activeTimer && (
+                                                <button
+                                                    onClick={() => {
+                                                        const time = extractTime(recipe.instructions[currentStep]);
+                                                        if (time) startTimer(time.seconds, time.label);
+                                                    }}
+                                                    style={{
+                                                        background: '#4CAF50',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '10px 20px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        marginBottom: '16px',
+                                                        fontSize: '15px'
+                                                    }}
+                                                >
+                                                    ⏱ Start timer: {extractTime(recipe.instructions[currentStep]).label}
+                                                </button>
+                                            )}
+                                            
                                             <div style={{display: 'flex', gap: '12px', marginBottom: '16px'}}>
                                                 <button 
                                                     className="btn-secondary"
@@ -945,7 +1184,7 @@
                                     ) : (
                                         <ol>
                                         {recipe.instructions.map((step, i) => (
-                                            <li key={i}>{step}</li>
+                                            <li key={i}>{convertTemperatureInText(step, tempUnit)}</li>
                                         ))}
                                     </ol>
                                     )}
