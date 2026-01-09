@@ -238,42 +238,78 @@ def consolidate_ingredients(ingredients):
     """Combine duplicate ingredients, adding quantities where possible."""
     from collections import defaultdict
     
-    # Group by normalized item name + unit
+    # Normalize item names (group variants together)
+    def normalize_item(item):
+        item = item.lower().strip()
+        # Remove trailing 's' for plurals (but not 'ss' like 'grass')
+        if item.endswith('s') and not item.endswith('ss'):
+            item = item[:-1]
+        
+        # Salt variants → salt
+        salt_variants = ['sea salt', 'flaky sea salt', 'flaky salt', 'kosher salt', 'table salt', 'fine salt', 'coarse salt']
+        if item in salt_variants or item.rstrip('s') in salt_variants:
+            return 'salt'
+        
+        # Pepper variants
+        if item in ['black pepper', 'ground pepper', 'cracked pepper', 'freshly ground pepper']:
+            return 'pepper'
+        
+        return item
+    
+    # Group by normalized item name only (not unit)
     groups = defaultdict(list)
     
     for ing in ingredients:
-        item = ing.get('item', '').lower().strip()
-        unit = (ing.get('unit') or '').lower().strip()
-        
-        # Normalize common variations
-        item = item.rstrip('s') if item.endswith('s') and not item.endswith('ss') else item
-        
-        key = (item, unit)
-        groups[key].append(ing)
+        item = normalize_item(ing.get('item', ''))
+        groups[item].append(ing)
     
     # Combine quantities
     result = []
-    for (item, unit), group in groups.items():
-        total_qty = None
-        has_qty = False
-        
+    for item, group in groups.items():
+        # Sub-group by unit to combine same-unit quantities
+        by_unit = defaultdict(list)
         for ing in group:
-            qty = ing.get('quantity')
-            if qty is not None:
-                has_qty = True
-                if total_qty is None:
-                    total_qty = 0
-                total_qty += qty
+            unit = (ing.get('unit') or '').lower().strip()
+            by_unit[unit].append(ing)
         
-        # Use original case from first occurrence
+        # Sum quantities within each unit
+        unit_totals = []
+        for unit, unit_group in by_unit.items():
+            total = 0
+            has_qty = False
+            for ing in unit_group:
+                qty = ing.get('quantity')
+                if qty is not None:
+                    has_qty = True
+                    total += qty
+            if has_qty:
+                unit_totals.append((total, unit))
+            elif not unit_totals:  # No quantity items (like "pinch of salt")
+                unit_totals.append((None, unit))
+        
+        # Format the quantity string
         original_item = group[0].get('item', item)
-        original_unit = group[0].get('unit', unit) if unit else None
         
-        result.append({
-            'quantity': total_qty if has_qty else None,
-            'unit': original_unit,
-            'item': original_item
-        })
+        if len(unit_totals) == 1:
+            qty, unit = unit_totals[0]
+            result.append({
+                'quantity': round(qty, 1) if qty else None,
+                'unit': unit or None,
+                'item': original_item
+            })
+        else:
+            # Multiple units - combine into display string like "60g + 2½ tbsp"
+            parts = []
+            for qty, unit in unit_totals:
+                if qty is not None:
+                    qty_str = str(round(qty, 1)) if qty != int(qty) else str(int(qty))
+                    parts.append(f"{qty_str} {unit}".strip())
+            
+            result.append({
+                'quantity': None,
+                'unit': ' + '.join(parts) if parts else None,
+                'item': original_item
+            })
     
     # Sort by item name
     result.sort(key=lambda x: x.get('item', '').lower())
