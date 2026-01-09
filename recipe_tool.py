@@ -530,13 +530,31 @@ class RecipeScraper:
         if isinstance(text, dict):
             # Some sites provide pre-parsed ingredients
             if 'quantity' in text or 'amount' in text:
-                qty = text.get('quantity') or text.get('amount')
+                qty_raw = text.get('quantity') or text.get('amount')
                 unit = text.get('unit') or text.get('unitText') or ''
                 item = text.get('name') or text.get('ingredient') or text.get('text') or ''
                 # Clean HTML from item
                 item = re.sub(r'<[^>]+>', '', str(item)).strip()
+                
+                # Parse quantity - might be "300g" or "300" or 300
+                qty = None
+                if qty_raw:
+                    if isinstance(qty_raw, (int, float)):
+                        qty = float(qty_raw)
+                    else:
+                        # Extract number from string like "300g" or "2-3"
+                        qty_str = str(qty_raw)
+                        # Check if unit is embedded in quantity
+                        unit_match = re.match(r'^([\d./\s]+)\s*([a-zA-Z]+)$', qty_str)
+                        if unit_match:
+                            qty = self._parse_quantity(unit_match.group(1))
+                            if not unit:
+                                unit = unit_match.group(2)
+                        else:
+                            qty = self._parse_quantity(qty_str)
+                
                 return Ingredient(
-                    quantity=float(qty) if qty else None,
+                    quantity=qty,
                     unit=unit if unit else None,
                     item=item,
                     original_text=str(text)
