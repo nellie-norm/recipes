@@ -510,8 +510,16 @@ class RecipeScraper:
             source_url=url
         )
     
-    def _parse_ingredient(self, text: str) -> Ingredient:
+    def _parse_ingredient(self, text) -> Ingredient:
         """Parse an ingredient string into structured data."""
+        # Handle dict inputs (some sites return structured ingredient objects)
+        if isinstance(text, dict):
+            # Try to extract text from common dict formats
+            text = text.get('text') or text.get('name') or text.get('ingredient') or str(text)
+        
+        if not isinstance(text, str):
+            text = str(text)
+        
         text = text.strip()
         original = text
         
@@ -550,8 +558,10 @@ class RecipeScraper:
             original_text=original
         )
     
-    def _is_section_header_or_note(self, text: str) -> bool:
+    def _is_section_header_or_note(self, text) -> bool:
         """Check if text is a section header or note rather than an ingredient."""
+        if not isinstance(text, str):
+            text = str(text) if text else ''
         text = text.strip()
         
         # Empty
