@@ -355,11 +355,25 @@ class RecipeScraper:
         
         # Parse instructions
         instructions = []
-        inst_text = scraper.instructions()
-        if inst_text:
-            # Split on newlines or numbered steps
-            steps = re.split(r'\n+|\d+\.\s+', inst_text)
-            instructions = [s.strip() for s in steps if s.strip()]
+        try:
+            inst_data = scraper.instructions()
+            if inst_data:
+                # Handle if it's a list
+                if isinstance(inst_data, list):
+                    for item in inst_data:
+                        if isinstance(item, dict):
+                            item = item.get('text') or item.get('name') or str(item)
+                        cleaned = self._clean_html_text(str(item))
+                        if cleaned:
+                            instructions.append(cleaned)
+                else:
+                    # It's a string - strip HTML tags first
+                    inst_text = self._clean_html_text(str(inst_data))
+                    # Split on newlines or numbered steps
+                    steps = re.split(r'\n+|\d+\.\s+', inst_text)
+                    instructions = [s.strip() for s in steps if s.strip()]
+        except Exception:
+            pass
         
         # Get servings
         servings = None
@@ -514,7 +528,20 @@ class RecipeScraper:
         """Parse an ingredient string into structured data."""
         # Handle dict inputs (some sites return structured ingredient objects)
         if isinstance(text, dict):
-            # Try to extract text from common dict formats
+            # Some sites provide pre-parsed ingredients
+            if 'quantity' in text or 'amount' in text:
+                qty = text.get('quantity') or text.get('amount')
+                unit = text.get('unit') or text.get('unitText') or ''
+                item = text.get('name') or text.get('ingredient') or text.get('text') or ''
+                # Clean HTML from item
+                item = re.sub(r'<[^>]+>', '', str(item)).strip()
+                return Ingredient(
+                    quantity=float(qty) if qty else None,
+                    unit=unit if unit else None,
+                    item=item,
+                    original_text=str(text)
+                )
+            # Otherwise try to extract text
             text = text.get('text') or text.get('name') or text.get('ingredient') or str(text)
         
         if not isinstance(text, str):
@@ -675,8 +702,13 @@ class RecipeScraper:
         return final
     
     def _clean_html_text(self, text: str) -> str:
-        """Clean HTML entities and normalize text."""
+        """Clean HTML entities, strip tags, and normalize text."""
         import html
+        if not text:
+            return ''
+        text = str(text)
+        # Strip HTML tags
+        text = re.sub(r'<[^>]+>', ' ', text)
         text = html.unescape(text)  # Decode &quot; &#39; etc.
         text = text.replace('\u2019', "'")  # Smart quotes
         text = text.replace('\u2018', "'")
@@ -686,8 +718,9 @@ class RecipeScraper:
         text = text.replace('\u2014', '-')  # Em dash
         text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
         text = text.strip()
-        # Remove leading hyphens/dashes from instructions
+        # Remove leading hyphens/dashes and step numbers from instructions
         text = re.sub(r'^[\-–—]\s*', '', text)
+        text = re.sub(r'^\d+\.\s*', '', text)  # Remove leading "1. ", "2. ", etc.
         return text.strip()
     
     def _parse_quantity(self, qty_str: str) -> Optional[float]:
