@@ -732,6 +732,27 @@ class RecipeScraper:
         # Strip HTML tags
         text = re.sub(r'<[^>]+>', ' ', text)
         text = html.unescape(text)  # Decode &quot; &#39; etc.
+        
+        # Fix common encoding issues (UTF-8 interpreted as Latin-1)
+        encoding_fixes = {
+            'â€™': "'",   # Right single quote
+            'â€˜': "'",   # Left single quote
+            'â€œ': '"',   # Left double quote
+            'â€': '"',    # Right double quote (partial)
+            'â€"': '—',   # Em dash
+            'â€"': '–',   # En dash
+            'Â½': '½',    # Half
+            'Â¼': '¼',    # Quarter
+            'Â¾': '¾',    # Three quarters
+            'Â°': '°',    # Degree
+            'Â ': ' ',    # Non-breaking space mangled
+        }
+        for bad, good in encoding_fixes.items():
+            text = text.replace(bad, good)
+        
+        # Also try to fix generic Â prefix issue (UTF-8 BOM remnants)
+        text = re.sub(r'Â([\u00A0-\u00FF])', r'\1', text)
+        
         text = text.replace('\u2019', "'")  # Smart quotes
         text = text.replace('\u2018', "'")
         text = text.replace('\u201c', '"')
