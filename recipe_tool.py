@@ -536,6 +536,10 @@ class RecipeScraper:
                 # Clean HTML from item
                 item = re.sub(r'<[^>]+>', '', str(item)).strip()
                 
+                # Check if it's a section header
+                if self._is_section_header_or_note(item):
+                    return None
+                
                 # Parse quantity - might be "300g" or "300" or 300
                 qty = None
                 if qty_raw:
@@ -543,7 +547,7 @@ class RecipeScraper:
                         qty = float(qty_raw)
                     else:
                         # Extract number from string like "300g" or "2-3"
-                        qty_str = str(qty_raw)
+                        qty_str = str(qty_raw).strip()  # Strip trailing whitespace!
                         # Check if unit is embedded in quantity
                         unit_match = re.match(r'^([\d./\s]+)\s*([a-zA-Z]+)$', qty_str)
                         if unit_match:
