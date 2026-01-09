@@ -429,9 +429,10 @@
             let matched = new Set();
             
             for (const { regex, unit, range } of patterns) {
+                // Reset regex state for each pattern
+                regex.lastIndex = 0;
                 let match;
                 while ((match = regex.exec(allText)) !== null) {
-                    const matchStr = match[0];
                     if (matched.has(match.index)) continue;
                     matched.add(match.index);
                     
@@ -446,7 +447,8 @@
                 }
             }
             
-            if (totalSeconds === 0) return null;
+            // Need at least 1 minute to show estimate
+            if (totalSeconds < 60) return null;
             
             // Format as human readable
             const hours = Math.floor(totalSeconds / 3600);
